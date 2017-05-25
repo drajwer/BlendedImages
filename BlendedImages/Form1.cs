@@ -29,8 +29,9 @@ namespace BlendedImages
         public Form1()
         {
             InitializeComponent();
-            this.MaximumSize = new Size(int.MaxValue, 350);
-            this.MinimumSize = new Size(400, 350);
+            MaximumSize = new Size(int.MaxValue, 350);
+            MinimumSize = new Size(400, 350);
+            Text = "BlendedImages";
             noImage = pictureBox1.Image;
             pictureBox1.SizeMode = PictureBoxSizeMode.StretchImage;
             pictureBox2.SizeMode = PictureBoxSizeMode.StretchImage;
