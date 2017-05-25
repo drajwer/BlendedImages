@@ -40,18 +40,9 @@ namespace BlendedImages
             pictureBox2.Tag = false;
             pictureBox2.Click += pictureBox_Click;
             KeyPreview = true;
-            this.KeyDown += new KeyEventHandler(Form1_KeyDown);
-            backgroundWorker1 = new BackgroundWorker();
-            backgroundWorker2 = new BackgroundWorker();
-            backgroundWorker1.DoWork += BackgroundWorker_DoWork;
-            backgroundWorker1.RunWorkerCompleted += BackgroundWorker_RunWorkerCompleted;
-            backgroundWorker1.ProgressChanged += BackgroundWorkerOnProgressChanged;
-            backgroundWorker2.ProgressChanged += BackgroundWorkerOnProgressChanged;
-            backgroundWorker2.DoWork += BackgroundWorker_DoWork;
-            backgroundWorker2.RunWorkerCompleted += BackgroundWorker_RunWorkerCompleted;
-            backgroundWorker1.WorkerReportsProgress = true;
-            backgroundWorker2.WorkerReportsProgress = true;
-            flowLayoutPanel1.DragDrop += FlowLayoutPanel_DragDrop;
+            this.KeyDown += Form1_KeyDown;
+            backgroundWorker1 = CreateBgrWorker();
+            backgroundWorker2 = CreateBgrWorker();
             flowLayoutPanel1.DragEnter += FlowLayoutPanelOnDragEnter;
 
             // Library class
@@ -59,6 +50,15 @@ namespace BlendedImages
             LoadImagesFromLibrary();
         }
 
+        private BackgroundWorker CreateBgrWorker()
+        {
+            BackgroundWorker worker = new BackgroundWorker();
+            worker.DoWork += BackgroundWorker_DoWork;
+            worker.RunWorkerCompleted += BackgroundWorker_RunWorkerCompleted;
+            worker.ProgressChanged += BackgroundWorkerOnProgressChanged;
+            worker.WorkerReportsProgress = true;
+            return worker;
+        }
         private void LoadImagesFromLibrary()
         {
             foreach (var path in library.ImagePaths)
@@ -135,14 +135,15 @@ namespace BlendedImages
                 return null;
 
             int thickness = 5;
-            PictureBox p = new PictureBox();
-            p.Image = Image.FromFile(file);
-            p.ClientSize = new Size(libraryImageWidth + 2 * thickness, libraryImageHeight + 2 * thickness);
-            p.BackColor = Color.White;
-            p.Padding = new Padding(thickness);
-            p.Image = Image.FromFile(file);
-            p.ImageLocation = file;
-            p.SizeMode = PictureBoxSizeMode.StretchImage;
+            PictureBox p = new PictureBox
+            {
+                Image = Image.FromFile(file),
+                ClientSize = new Size(libraryImageWidth + 2 * thickness, libraryImageHeight + 2 * thickness),
+                BackColor = Color.White,
+                Padding = new Padding(thickness),
+                ImageLocation = file,
+                SizeMode = PictureBoxSizeMode.StretchImage
+            };
             p.MouseClick += P_MouseClick;
             return p;
         }
@@ -187,7 +188,7 @@ namespace BlendedImages
             BackgroundWorker worker = sender as BackgroundWorker;
             if (worker == null)
                 return;
-            BackgroundWorker secondWorker = worker == backgroundWorker1 ? backgroundWorker1 : backgroundWorker2;
+            BackgroundWorker secondWorker = worker == backgroundWorker1 ? backgroundWorker2 : backgroundWorker1;
             ProgressBar bar = worker == backgroundWorker1 ? progressBar1 : progressBar2;
             bar.Value = bar.Minimum;
             SetProgressControls(bar, label2, secondWorker, false);
@@ -275,18 +276,21 @@ namespace BlendedImages
             };
             if (!backgroundWorker1.IsBusy)
             {
-                args.worker = backgroundWorker1;
-                SetProgressControls(progressBar1, label2, backgroundWorker2, true);
-                backgroundWorker1.RunWorkerAsync(args);
+                StartWork(backgroundWorker1, backgroundWorker2, args);
             }
             else if (!backgroundWorker2.IsBusy)
             {
-                args.worker = backgroundWorker2;
-                SetProgressControls(progressBar2, label2, backgroundWorker1, true);
-                backgroundWorker2.RunWorkerAsync(args);
+                StartWork(backgroundWorker2, backgroundWorker1, args);
             }
         }
 
+        private void StartWork(BackgroundWorker worker, BackgroundWorker secondWorker, BgrWorkerArgs args)
+        {
+            args.worker = worker;
+            ProgressBar bar = worker == backgroundWorker1 ? progressBar1 : progressBar2;
+            SetProgressControls(bar, label2, secondWorker, true);
+            worker.RunWorkerAsync(args);
+        }
 
         private Form PerformBlending(BgrWorkerArgs args)
         {
@@ -301,15 +305,7 @@ namespace BlendedImages
             {
                 for (int y = 0; y < height; y++)
                 {
-
-                    Color color1 = bitmap1.GetPixel(x, y);
-                    Color color2 = bitmap2.GetPixel(x, y);
-                    int R = (int)(alfa * color1.R + (1 - alfa) * color2.R);
-                    int G = (int)(alfa * color1.G + (1 - alfa) * color2.G);
-                    int B = (int)(alfa * color1.B + (1 - alfa) * color2.B);
-
-                    Color resColor = Color.FromArgb(R, G, B);
-                    resultBitmap.SetPixel(x, y, resColor);
+                    ProceedPixel(bitmap1, bitmap2, alfa, resultBitmap, x, y);
                     int percentage = (int)((double)(x * height + y) * 100 / (double)(width * height));
                     if (lastReportedPercentage + 5 < percentage)
                     {
@@ -320,6 +316,18 @@ namespace BlendedImages
             }
             Form form = new ImageWindow(resultBitmap, args.number, this);
             return form;
+        }
+
+        private static void ProceedPixel(Bitmap bitmap1, Bitmap bitmap2, double alfa, Bitmap resultBitmap, int x, int y)
+        {
+            Color color1 = bitmap1.GetPixel(x, y);
+            Color color2 = bitmap2.GetPixel(x, y);
+            int R = (int)(alfa * color1.R + (1 - alfa) * color2.R);
+            int G = (int)(alfa * color1.G + (1 - alfa) * color2.G);
+            int B = (int)(alfa * color1.B + (1 - alfa) * color2.B);
+
+            Color resColor = Color.FromArgb(R, G, B);
+            resultBitmap.SetPixel(x, y, resColor);
         }
 
         private void pictureBox_Click(object sender, EventArgs e)
